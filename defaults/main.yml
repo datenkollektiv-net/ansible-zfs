@@ -195,3 +195,13 @@ zfs_monitoring_capacity_threshold: 80
 zfs_monitoring_scrub_max_age: 8
 
 zfs_monitoring_email_dest: root@localhost
+
+# zfs encryption
+# defautl secret path where keys are stored on local ansible controller
+# secret: 'ansible/secret'
+zfs__keyfile_remote_location: "/var/local/zfs_encryption_keyfiles"
+zfs__secret_path: '{{ secret + "/zfs_encryption/" + ansible_fqdn }}'
+zfs__keyfile_owner: 'root'
+zfs__keyfile_group: 'root'
+zfs__keyfile_mode: '0600'
+zfs__keyfile_gen_command: 'pwgen --secure 123 1'

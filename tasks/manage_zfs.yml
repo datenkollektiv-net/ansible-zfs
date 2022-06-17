@@ -83,6 +83,95 @@
   with_items: "{{ zfs_pools }}"
   when: zfs_create_pools
 
+- name: Create secrets directory on Ansible controller
+  file:
+    path:  '{{ zfs__secret_path + "/" + item.name }}'
+    state: 'directory'
+      #owner: '{{ zfs__secret_owner }}'
+      #group: '{{ zfs__secret_group }}'
+      #mode:  '{{ zfs__secret_mode }}'
+  become: False
+  delegate_to: 'localhost'
+  when: (item.encryption is defined and item.encryption | bool)
+  with_items: '{{ zfs_filesystems|d([]) }}'
+
+- name: Generate ZFS text/passphrase keyfile on the Ansible controller
+  shell: 'set -o nounset -o pipefail -o errexit &&
+          {{ item.keyfile_gen_command|d(zfs__keyfile_gen_command) }} \
+          | tr -d "\n" > {{ (item.keyfile | d(zfs__secret_path + "/" + item.name + "/keyfile.raw")) | quote }}'
+  args:
+    executable: 'bash'
+    creates: '{{ item.keyfile | d(zfs__secret_path + "/" + item.name + "/keyfile.raw") }}'
+  become: False
+  delegate_to: 'localhost'
+  register: zfs__register_keyfile_gen
+  when: (item.encryption is defined and item.encryption | bool)
+  with_items: '{{ zfs_filesystems|d([]) }}'
+
+    # If local keyfiles shall not have default permissions
+    # - name: Enforce permissions of the keyfile on the Ansible controller
+    #   file:
+    #     path:  '{{ item.keyfile | d(zfs__secret_path + "/" + item.name + "/keyfile.raw") }}'
+    #     owner: '{{ zfs__secret_owner }}'
+    #     group: '{{ zfs__secret_group }}'
+    #     mode:  '{{ zfs__secret_mode }}'
+    #   become: False
+    #   delegate_to: 'localhost'
+    #   when: (item.encryption is defined and item.encryption | bool)
+    #   with_items: '{{ zfs_filesystems|d([]) }}'
+    #
+- name: Ensure keyfile directory on remote system exists
+  file:
+    path:  '{{ zfs__keyfile_remote_location }}'
+    state: 'directory'
+      #owner: '{{ zfs__secret_owner }}'
+      #group: '{{ zfs__secret_group }}'
+      #mode:  '{{ zfs__secret_mode }}'
+  when: (item.encryption is defined and item.encryption | bool)
+  with_items: '{{ zfs_filesystems|d([]) }}'
+
+- name: Copy keyfiles to remote system
+  copy:
+    dest: '{{ zfs__keyfile_remote_location + "/" + item.name + "_keyfile.raw" }}'
+    backup:   '{{ item.keyfile_backup         | d(omit) }}'
+    follow:   '{{ item.keyfile_follow         | d(omit) }}'
+    force:    '{{ item.keyfile_force          | d(omit) }}'
+    group:    '{{ item.keyfile_group          | d(zfs__keyfile_group) }}'
+    mode:     '{{ item.keyfile_mode           | d(zfs__keyfile_mode) }}'
+    owner:    '{{ item.keyfile_owner          | d(zfs__keyfile_owner) }}'
+    selevel:  '{{ item.keyfile_selevel        | d(omit) }}'
+    serole:   '{{ item.keyfile_serole         | d(omit) }}'
+    setype:   '{{ item.keyfile_setype         | d(omit) }}'
+    seuser:   '{{ item.keyfile_seuser         | d(omit) }}'
+    src:      '{{ item.keyfile                | d(zfs__secret_path + "/" + item.name + "/keyfile.raw") }}'
+    validate: '{{ item.keyfile_validate       | d(omit) }}'
+  when: (item.encryption is defined and item.encryption | bool)
+  with_items: '{{ zfs_filesystems|d([]) }}'
+    #no_log: '{{ debops__no_log | d(True) }}'
+
+- name: manage_zfs | checking existing datasets
+  shell: "zfs list | awk 'FNR >1' | awk '{print $1}'"
+  changed_when: false
+  register: zfs_datasets
+  check_mode: no
+  when: zfs_pools is defined
+
+- name: generate systemd service for zfs-load-key
+  template:
+    src: usr/lib/systemd/system//zfs-load-key.service.j2
+    dest: /usr/lib/systemd/system/zfs-load-key.service
+    force: yes
+    owner: root
+    group: root
+    mode: '0600'
+  when: zfs_create_filesystems
+
+- name: enable systemd service for zfs-load-key
+  systemd:
+    name: zfs-load-key
+    state: started
+    enabled: yes
+
 - name: manage_zfs | managing filesystems
   zfs:
     name: "{{ item.pool }}/{{ item.name }}"
@@ -99,6 +188,10 @@
       sync: "{{ item.sync|default(omit) }}"
       snapdev: "{{ item.snapdev|default('hidden')}}"
       snapdir: "{{ item.snapdir|default('hidden')}}"
+      # encryption
+      encryption: "{{ 'on' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
+      keyformat: "{{ 'passphrase' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
+      keylocation: '{{ "file:///" + zfs__keyfile_remote_location + "/" + item.name + "_keyfile.raw" if item.encryption is true else omit }}'
     state: "{{ item.state }}"
   with_items: "{{ zfs_filesystems }}"
   when: zfs_create_filesystems
