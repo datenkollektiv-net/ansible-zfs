@@ -172,6 +172,26 @@
     state: started
     enabled: yes
 
+- name: overwrite zfs-mount service - create directory
+  file:
+    path: /etc/systemd/system/zfs-mount.service.d/
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: copy overwrite zfs-mount service
+  template:
+    src: etc/systemd/system/zfs-mount.service.d/override.conf.j2
+    dest: /etc/systemd/system/zfs-mount.service.d/override.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Just force systemd to reread configs
+  systemd:
+    daemon_reload: yes
+
 - name: manage_zfs | managing filesystems
   zfs:
     name: "{{ item.pool }}/{{ item.name }}"
