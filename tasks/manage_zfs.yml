@@ -156,41 +156,46 @@
   check_mode: no
   when: zfs_pools is defined
 
-- name: generate systemd service for zfs-load-key
-  template:
-    src: usr/lib/systemd/system//zfs-load-key.service.j2
-    dest: /usr/lib/systemd/system/zfs-load-key.service
-    force: yes
-    owner: root
-    group: root
-    mode: '0600'
-  when: zfs_create_filesystems
+- name: set fact if encrypted dataset
+  set_fact:
+    zfs_encryption_enabled: "{{ (zfs_encryption_enabled | default(false)) or item.encryption }}"
+  with_items: "{{ zfs_filesystems }}"
 
-- name: enable systemd service for zfs-load-key
-  systemd:
-    name: zfs-load-key
-    state: started
-    enabled: yes
 
-- name: overwrite zfs-mount service - create directory
-  file:
-    path: /etc/systemd/system/zfs-mount.service.d/
-    state: directory
-    owner: root
-    group: root
-    mode: 0755
-
-- name: copy overwrite zfs-mount service
-  template:
-    src: etc/systemd/system/zfs-mount.service.d/override.conf.j2
-    dest: /etc/systemd/system/zfs-mount.service.d/override.conf
-    owner: root
-    group: root
-    mode: 0644
-
-- name: Just force systemd to reread configs
-  systemd:
-    daemon_reload: yes
+- name: generate systemd service for zfs
+  block:
+  - name: generate systemd service for zfs-load-key
+    template:
+      src: usr/lib/systemd/system/zfs-load-key.service.j2
+      dest: /usr/lib/systemd/system/zfs-load-key.service
+      force: yes
+      owner: root
+      group: root
+      mode: '0600'
+  - name: enable systemd service for zfs-load-key
+    systemd:
+      name: zfs-load-key
+      state: started
+      enabled: yes
+      daemon_reload: yes
+  - name: overwrite zfs-mount service - create directory
+    file:
+      path: /etc/systemd/system/zfs-mount.service.d/
+      state: directory
+      owner: root
+      group: root
+      mode: 0755
+  - name: copy overwrite zfs-mount service
+    template:
+      src: etc/systemd/system/zfs-mount.service.d/override.conf.j2
+      dest: /etc/systemd/system/zfs-mount.service.d/override.conf
+      owner: root
+      group: root
+      mode: 0644
+  - name: Just force systemd to reread configs
+    systemd:
+      daemon_reload: yes
+  when: zfs_encryption_enabled is defined and zfs_encryption_enabled
 
 - name: manage_zfs | managing filesystems
   zfs:
@@ -209,9 +214,10 @@
       snapdev: "{{ item.snapdev|default('hidden')}}"
       snapdir: "{{ item.snapdir|default('hidden')}}"
       # encryption
-      encryption: "{{ 'on' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
-      keyformat: "{{ 'passphrase' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
-      keylocation: '{{ "file:///" + zfs__keyfile_remote_location + "/" + item.name + "_keyfile.raw" if item.encryption is true else omit }}'
+      #encryption: "{{ 'on' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
+      encryption: "{{ item.encryption if ( item.encryption|default(false) is not false and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
+      keyformat: "{{ 'passphrase' if ( item.encryption|default(false) is not false and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
+      keylocation: '{{ "file:///" + zfs__keyfile_remote_location + "/" + item.name + "_keyfile.raw" if item.encryption|default(false) is not false else omit }}'
     state: "{{ item.state }}"
   with_items: "{{ zfs_filesystems }}"
   when: zfs_create_filesystems
