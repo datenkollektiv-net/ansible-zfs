@@ -213,6 +213,7 @@
       sync: "{{ item.sync|default(omit) }}"
       snapdev: "{{ item.snapdev|default('hidden')}}"
       snapdir: "{{ item.snapdir|default('hidden')}}"
+      acltype: "{{ item.acltype|default(omit) }}"
       # encryption
       #encryption: "{{ 'on' if ( item.encryption is true and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
       encryption: "{{ item.encryption if ( item.encryption|default(false) is not false and item.pool + '/' + item.name not in zfs_datasets.stdout_lines ) else omit }}"
