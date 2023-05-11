@@ -74,6 +74,7 @@
       mountpoint: "{{ item.mountpoint|default(omit) }}"
       primarycache: "{{ item.primarycache|default(omit) }}"
       quota: "{{ item.quota|default(omit) }}"
+      refquota: "{{ item.refquota|default(omit) }}"
       recordsize: "{{ item.recordsize|default(omit) }}"
       sharenfs: "{{ item.sharenfs|default(omit) }}"
       sync: "{{ item.sync|default(omit) }}"
@@ -85,7 +86,7 @@
 
 - name: Create secrets directory on Ansible controller
   file:
-    path:  '{{ zfs__secret_path + "/" + item.name }}'
+    path: '{{ zfs__secret_path + "/" + item.name }}'
     state: 'directory'
       #owner: '{{ zfs__secret_owner }}'
       #group: '{{ zfs__secret_group }}'
@@ -208,6 +209,7 @@
       mountpoint: "{{ item.mountpoint|default(omit) }}"
       primarycache: "{{ item.primarycache|default(omit) }}"
       quota: "{{ item.quota|default(omit) }}"
+      refquota: "{{ item.refquota|default(omit) }}"
       recordsize: "{{ item.recordsize|default(omit) }}"
       sharenfs: "{{ item.sharenfs|default(omit) }}"
       sync: "{{ item.sync|default(omit) }}"
@@ -230,6 +232,7 @@
       compression: "{{ item.compression|default(omit) }}"
       dedup: "{{ item.dedup|default(omit) }}"
       quota: "{{ item.quota|default(omit) }}"
+      refquota: "{{ item.refquota|default(omit) }}"
       primarycache: "{{ item.primarycache|default(omit) }}"
       recordsize: "{{ item.recordsize|default(omit) }}"
   #    shareiscsi: "{{ item.shareiscsi|default(omit) }}"
