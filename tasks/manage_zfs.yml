@@ -159,7 +159,7 @@
 
 - name: set fact if encrypted dataset
   set_fact:
-    zfs_encryption_enabled: "{{ (zfs_encryption_enabled | default(false)) or item.encryption }}"
+    zfs_encryption_enabled: "{{ (zfs_encryption_enabled | default(false)) or (item.encryption | default(false)) }}"
   with_items: "{{ zfs_filesystems }}"
 
 
